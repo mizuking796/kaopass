@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>KaoPass - 顔パス認証</title>
+<meta name="description" content="表情パスワード認証アプリ">
+<!-- CSP relaxed for MediaPipe WASM + face-api.js model loading -->
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <!-- consent screen -->
+  <div id="screen-consent" class="screen active">
+    <div class="consent-container">
+      <div class="consent-icon">
+        <svg viewBox="0 0 80 80" width="80" height="80"><circle cx="40" cy="40" r="38" fill="none" stroke="var(--accent)" stroke-width="2"/><ellipse cx="40" cy="35" rx="16" ry="20" fill="none" stroke="var(--accent)" stroke-width="1.5"/><circle cx="33" cy="30" r="2" fill="var(--accent)"/><circle cx="47" cy="30" r="2" fill="var(--accent)"/><path d="M33 40 Q40 46 47 40" fill="none" stroke="var(--accent)" stroke-width="1.5"/></svg>
+      </div>
+      <h1 class="consent-title">KaoPass</h1>
+      <p class="consent-subtitle">表情パスワード認証</p>
+      <div class="consent-card">
+        <h3>カメラの使用について</h3>
+        <p>このアプリは認証のためにカメラを使用します。映像データはすべてお使いのデバイス内で処理され、外部サーバーには送信されません。</p>
+        <ul>
+          <li>顔の特徴データはデバイス内のIndexedDBに暗号化保存</li>
+          <li>カメラ映像はリアルタイム処理のみ、録画・保存なし</li>
+          <li>インターネット接続なしで動作（初回ライブラリ読込除く）</li>
+        </ul>
+      </div>
+      <label class="consent-check">
+        <input type="checkbox" id="consent-checkbox">
+        <span class="checkmark"></span>
+        <span>上記内容を理解し、カメラの使用に同意します</span>
+      </label>
+      <button id="btn-consent" class="btn-primary" disabled>利用開始</button>
+    </div>
+  </div>
+
+  <!-- tutorial screen -->
+  <div id="screen-tutorial" class="screen">
+    <div class="tutorial-container">
+      <button id="btn-skip-tutorial" class="btn-text tutorial-skip">スキップ</button>
+      <div class="tutorial-slides" id="tutorial-slides">
+        <div class="tutorial-slide">
+          <div class="tutorial-illustration">
+            <svg viewBox="0 0 200 160" width="200" height="160">
+              <ellipse cx="100" cy="70" rx="40" ry="50" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="6 3"/>
+              <circle cx="88" cy="60" r="4" fill="var(--accent)"/>
+              <circle cx="112" cy="60" r="4" fill="var(--accent)"/>
+              <path d="M88 80 Q100 90 112 80" fill="none" stroke="var(--accent)" stroke-width="2"/>
+              <path d="M60 130 L100 110 L140 130" fill="none" stroke="var(--text2)" stroke-width="1" stroke-dasharray="4 2"/>
+              <text x="60" y="145" fill="var(--text2)" font-size="10" text-anchor="middle">左</text>
+              <text x="100" y="145" fill="var(--text2)" font-size="10" text-anchor="middle">正面</text>
+              <text x="140" y="145" fill="var(--text2)" font-size="10" text-anchor="middle">右</text>
+            </svg>
+          </div>
+          <h2>1. 顔を登録する</h2>
+          <p>5方向から顔をスキャンして、あなただけの顔データを作成します。</p>
+        </div>
+        <div class="tutorial-slide">
+          <div class="tutorial-illustration">
+            <svg viewBox="0 0 200 160" width="200" height="160">
+              <rect x="20" y="30" width="40" height="40" rx="8" fill="var(--surface2)" stroke="var(--accent)" stroke-width="1.5"/>
+              <text x="40" y="56" fill="var(--accent)" font-size="20" text-anchor="middle">😊</text>
+              <rect x="80" y="30" width="40" height="40" rx="8" fill="var(--surface2)" stroke="var(--accent)" stroke-width="1.5"/>
+              <text x="100" y="56" fill="var(--accent)" font-size="20" text-anchor="middle">😮</text>
+              <rect x="140" y="30" width="40" height="40" rx="8" fill="var(--surface2)" stroke="var(--accent)" stroke-width="1.5"/>
+              <text x="160" y="56" fill="var(--accent)" font-size="20" text-anchor="middle">😗</text>
+              <path d="M40 80 L100 80 L160 80" stroke="var(--green)" stroke-width="2" marker-end="url(#arrowG)"/>
+              <defs><marker id="arrowG" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0 0 L8 3 L0 6" fill="var(--green)"/></marker></defs>
+              <text x="100" y="110" fill="var(--text2)" font-size="12" text-anchor="middle">表情の組み合わせ = パスワード</text>
+            </svg>
+          </div>
+          <h2>2. 表情パスワードを作る</h2>
+          <p>6種類の表情と視線方向を組み合わせて、あなただけのパスワードを作ります。</p>
+        </div>
+        <div class="tutorial-slide">
+          <div class="tutorial-illustration">
+            <svg viewBox="0 0 200 160" width="200" height="160">
+              <circle cx="100" cy="60" r="45" fill="none" stroke="var(--green)" stroke-width="2"/>
+              <ellipse cx="100" cy="55" rx="20" ry="25" fill="none" stroke="var(--text)" stroke-width="1.5"/>
+              <circle cx="92" cy="50" r="3" fill="var(--text)"/>
+              <circle cx="108" cy="50" r="3" fill="var(--text)"/>
+              <path d="M92 62 Q100 68 108 62" fill="none" stroke="var(--text)" stroke-width="1.5"/>
+              <polyline points="80 105 92 120 125 90" fill="none" stroke="var(--green)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+              <text x="100" y="148" fill="var(--green)" font-size="13" text-anchor="middle" font-weight="600">認証成功！</text>
+            </svg>
+          </div>
+          <h2>3. 顔パスでロック解除</h2>
+          <p>顔を認識して、表情パスワードを順番に再現するだけ。手ぶらで認証完了。</p>
+        </div>
+      </div>
+      <div class="tutorial-dots" id="tutorial-dots">
+        <span class="dot active"></span>
+        <span class="dot"></span>
+        <span class="dot"></span>
+      </div>
+      <button id="btn-tutorial-next" class="btn-primary">次へ</button>
+    </div>
+  </div>
+
+  <!-- register face screen -->
+  <div id="screen-register-face" class="screen">
+    <div class="camera-screen">
+      <div class="camera-header">
+        <h2>顔を登録</h2>
+        <p id="register-face-instruction">カメラのレンズを見てください</p>
+      </div>
+      <div class="camera-viewport">
+        <video id="register-face-video" autoplay playsinline muted></video>
+        <canvas id="register-face-canvas" class="overlay-canvas"></canvas>
+        <div class="face-guide-ellipse"></div>
+        <div id="camera-look-overlay" class="camera-look-overlay">
+          <div class="look-icon">👁</div>
+          <div class="look-text">カメラのレンズを<br>見てください</div>
+        </div>
+        <div id="register-face-flash" class="camera-flash"></div>
+      </div>
+      <div class="angle-chips" id="angle-chips">
+        <div class="angle-chip active" data-angle="front">正面</div>
+        <div class="angle-chip" data-angle="left">左</div>
+        <div class="angle-chip" data-angle="right">右</div>
+        <div class="angle-chip" data-angle="up">上</div>
+        <div class="angle-chip" data-angle="down">下</div>
+      </div>
+      <div class="register-face-progress">
+        <div class="progress-bar"><div id="register-face-bar" class="progress-fill" style="width:0%"></div></div>
+        <span id="register-face-count">0 / 5</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- register expression screen - selection phase -->
+  <div id="screen-register-expression" class="screen">
+    <div class="expression-setup">
+      <div class="expression-header">
+        <h2>表情パスワード作成</h2>
+        <p>表情と視線を組み合わせてパスワードを作ります</p>
+      </div>
+      <div class="mini-camera-wrapper">
+        <video id="expr-preview-video" autoplay playsinline muted></video>
+        <span id="expr-preview-label" class="expression-live-label">--</span>
+      </div>
+      <div class="password-length-selector">
+        <label>パスワード長:</label>
+        <div class="length-options" id="length-options">
+          <button class="length-btn" data-len="3">3</button>
+          <button class="length-btn active" data-len="4">4</button>
+          <button class="length-btn" data-len="5">5</button>
+          <button class="length-btn" data-len="6">6</button>
+        </div>
+      </div>
+      <div class="expression-palette" id="expression-palette">
+        <!-- 8 expression cards filled by JS -->
+      </div>
+      <div class="gaze-section">
+        <label class="gaze-toggle-label">
+          <input type="checkbox" id="gaze-toggle"> 視線方向を追加（オプション）
+        </label>
+        <div class="gaze-grid hidden" id="gaze-grid">
+          <!-- 3x3 gaze grid filled by JS -->
+        </div>
+      </div>
+      <div class="sequence-bar" id="sequence-bar">
+        <div class="sequence-placeholder">表情を選択してください</div>
+      </div>
+      <div class="expression-actions">
+        <button id="btn-undo-expr" class="btn-secondary" disabled>取り消し</button>
+        <button id="btn-confirm-expr" class="btn-primary" disabled>確定して録画</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- register expression - recording phase -->
+  <div id="screen-register-recording" class="screen">
+    <div class="camera-screen">
+      <div class="camera-header">
+        <h2>表情を録画</h2>
+        <p id="recording-instruction">下の表情を真似してください</p>
+      </div>
+      <div class="camera-viewport">
+        <video id="recording-video" autoplay playsinline muted></video>
+        <canvas id="recording-canvas" class="overlay-canvas"></canvas>
+        <div id="recording-target-icon" class="target-expression-icon"></div>
+        <div id="recording-gaze-dot" class="gaze-target-dot hidden"></div>
+      </div>
+      <div class="match-meter">
+        <div class="match-bar"><div id="recording-match-fill" class="match-fill"></div></div>
+        <span id="recording-match-pct">0%</span>
+      </div>
+      <div class="recording-steps" id="recording-steps">
+        <!-- step dots filled by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- auth face screen -->
+  <div id="screen-auth-face" class="screen">
+    <div class="camera-screen">
+      <div class="camera-header">
+        <h2>顔認証</h2>
+        <p id="auth-face-instruction">カメラに顔を向けてください</p>
+      </div>
+      <div class="camera-viewport">
+        <video id="auth-face-video" autoplay playsinline muted></video>
+        <canvas id="auth-face-canvas" class="overlay-canvas"></canvas>
+        <div class="face-guide-ellipse"></div>
+        <div id="auth-scanline" class="scanline"></div>
+      </div>
+      <div class="auth-face-status">
+        <div class="spinner" id="auth-face-spinner"></div>
+        <span id="auth-face-status-text">認識中...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- auth expression screen -->
+  <div id="screen-auth-expression" class="screen">
+    <div class="camera-screen">
+      <div class="camera-header">
+        <h2>表情認証</h2>
+        <p id="auth-expr-instruction">表情を順番に再現してください</p>
+      </div>
+      <div class="camera-viewport">
+        <video id="auth-expr-video" autoplay playsinline muted></video>
+        <canvas id="auth-expr-canvas" class="overlay-canvas"></canvas>
+        <div id="auth-target-icon" class="target-expression-icon"></div>
+        <div id="auth-gaze-dot" class="gaze-target-dot hidden"></div>
+      </div>
+      <div class="match-meter">
+        <div class="match-bar"><div id="auth-match-fill" class="match-fill"></div></div>
+        <span id="auth-match-pct">0%</span>
+      </div>
+      <div class="auth-timer-bar"><div id="auth-timer-fill" class="timer-fill"></div></div>
+      <div class="auth-steps" id="auth-steps">
+        <!-- step dots filled by JS -->
+      </div>
+      <div id="auth-cooldown" class="cooldown-overlay hidden">
+        <p>認証失敗</p>
+        <span id="cooldown-timer">10</span><span>秒後にリトライ</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- auth success screen -->
+  <div id="screen-auth-success" class="screen">
+    <div class="success-container">
+      <div class="success-check">
+        <svg viewBox="0 0 100 100" width="100" height="100">
+          <circle cx="50" cy="50" r="45" fill="none" stroke="var(--green)" stroke-width="3" class="success-circle"/>
+          <polyline points="30 52 44 66 72 38" fill="none" stroke="var(--green)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" class="success-tick"/>
+        </svg>
+      </div>
+      <h1 class="success-title">認証成功！</h1>
+      <p class="success-time" id="auth-time">認証時間: --</p>
+      <div class="success-details" id="success-details"></div>
+      <div class="success-actions">
+        <button id="btn-retry-auth" class="btn-primary">もう一度</button>
+        <button id="btn-reset" class="btn-secondary btn-danger">リセット</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- loading overlay -->
+  <div id="loading-overlay" class="loading-overlay hidden">
+    <div class="loading-spinner"></div>
+    <p id="loading-text">モデルを読み込み中...</p>
+  </div>
+</div>
+
+<!-- MediaPipe: loaded via dynamic import() in face-engine.js (ESM) -->
+<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.14/dist/face-api.min.js" crossorigin="anonymous"></script>
+<script src="js/db.js"></script>
+<script src="js/expression-detector.js"></script>
+<script src="js/face-engine.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
