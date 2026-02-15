@@ -800,7 +800,7 @@
 
     const hasBio = exprData.blendshapeProfiles && exprData.blendshapeProfiles.some(p => p);
     details.innerHTML = `
-      <div><strong>パスワード長:</strong> ${exprData.sequence.length}ステップ</div>
+      <div><strong>表情組み合わせ数:</strong> ${exprData.sequence.length}</div>
       <div><strong>表情バイオメトリクス:</strong> ${hasBio ? 'ON（筋肉パターン照合）' : 'OFF'}</div>
       <div><strong>常時顔照合:</strong> ON</div>
       <div><strong>シーケンス:</strong></div>
