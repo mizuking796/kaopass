@@ -159,6 +159,7 @@ html, body {
 
 /* === Camera screens === */
 .camera-screen {
+  position: relative;
   width: 100%; max-width: 480px;
   padding: 16px; display: flex;
   flex-direction: column; height: 100%;
@@ -534,9 +535,15 @@ html, body {
   font-size: 13px; color: var(--text2); line-height: 1.8;
 }
 .success-actions {
-  display: flex; gap: 12px; justify-content: center;
+  display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
 }
 .success-actions .btn-primary { max-width: 160px; }
+
+.auth-reregister-link {
+  position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+  font-size: 13px; color: var(--text2); opacity: .7;
+}
+.auth-reregister-link:hover { opacity: 1; }
 
 /* === Loading overlay === */
 .loading-overlay {

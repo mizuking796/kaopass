@@ -886,11 +886,27 @@
     }, 1000);
   }
 
+  /* ══════════ Re-register ══════════ */
+  async function startReRegister() {
+    if (!confirm('現在の登録を削除して、新しく登録し直しますか？')) return;
+    // Stop any running camera/detection
+    FaceEngine.stopDetectionLoop();
+    document.querySelectorAll('video').forEach(v => FaceEngine.stopCamera(v));
+    stopAuthGlobalTimer();
+    if (authTimerId) { cancelAnimationFrame(authTimerId); authTimerId = null; }
+    // Clear DB but keep consent
+    await KaoDB.clearAll();
+    authFailCount = 0;
+    startRegisterFace();
+  }
+
   /* ══════════ Auth Success Screen ══════════ */
   function initSuccessScreen() {
     $('btn-retry-auth').addEventListener('click', () => {
       startAuthFace();
     });
+
+    $('btn-reregister').addEventListener('click', () => startReRegister());
 
     $('btn-reset').addEventListener('click', async () => {
       if (!confirm('登録データをすべて削除しますか？')) return;
@@ -904,6 +920,7 @@
   async function boot() {
     initConsent();
     initSuccessScreen();
+    $('btn-reregister-from-auth').addEventListener('click', () => startReRegister());
 
     const consent = localStorage.getItem('kaopass_consent');
     if (consent) {
