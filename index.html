@@ -72,7 +72,7 @@
             </svg>
           </div>
           <h2>2. 表情パスワードを作る</h2>
-          <p>6種類の表情と視線方向を組み合わせて、あなただけのパスワードを作ります。</p>
+          <p>6種類の表情を組み合わせて、あなただけのパスワードを作ります。</p>
         </div>
         <div class="tutorial-slide">
           <div class="tutorial-illustration">
@@ -135,7 +135,7 @@
     <div class="expression-setup">
       <div class="expression-header">
         <h2>表情パスワード作成</h2>
-        <p>表情と視線を組み合わせてパスワードを作ります</p>
+        <p>表情を組み合わせてパスワードを作ります</p>
       </div>
       <div class="mini-camera-wrapper">
         <video id="expr-preview-video" autoplay playsinline muted></video>
@@ -152,14 +152,6 @@
       </div>
       <div class="expression-palette" id="expression-palette">
         <!-- 8 expression cards filled by JS -->
-      </div>
-      <div class="gaze-section">
-        <label class="gaze-toggle-label">
-          <input type="checkbox" id="gaze-toggle"> 視線方向を追加（オプション）
-        </label>
-        <div class="gaze-grid hidden" id="gaze-grid">
-          <!-- 3x3 gaze grid filled by JS -->
-        </div>
       </div>
       <div class="sequence-bar" id="sequence-bar">
         <div class="sequence-placeholder">表情を選択してください</div>
@@ -182,7 +174,6 @@
         <video id="recording-video" autoplay playsinline muted></video>
         <canvas id="recording-canvas" class="overlay-canvas"></canvas>
         <div id="recording-target-icon" class="target-expression-icon"></div>
-        <div id="recording-gaze-dot" class="gaze-target-dot hidden"></div>
       </div>
       <div class="match-meter">
         <div class="match-bar"><div id="recording-match-fill" class="match-fill"></div></div>
@@ -225,7 +216,6 @@
         <video id="auth-expr-video" autoplay playsinline muted></video>
         <canvas id="auth-expr-canvas" class="overlay-canvas"></canvas>
         <div id="auth-target-icon" class="target-expression-icon"></div>
-        <div id="auth-gaze-dot" class="gaze-target-dot hidden"></div>
       </div>
       <div class="match-meter">
         <div class="match-bar"><div id="auth-match-fill" class="match-fill"></div></div>

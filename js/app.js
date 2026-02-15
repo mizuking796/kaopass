@@ -6,9 +6,7 @@
   let currentScreen = 'consent';
   let tutorialIndex = 0;
   let passwordLength = 4;
-  let selectedSequence = [];  // [{exprId, gazeId?}]
-  let gazeEnabled = false;
-  let selectedGaze = null;
+  let selectedSequence = [];  // [{exprId}]
 
   // Face registration
   const ANGLES = ['front', 'left', 'right', 'up', 'down'];
@@ -87,9 +85,6 @@
 
   function exprById(id) {
     return ExpressionDetector.EXPRESSIONS.find(e => e.id === id);
-  }
-  function gazeById(id) {
-    return ExpressionDetector.GAZE_DIRS.find(g => g.id === id);
   }
 
   /* ══════════ Consent Screen ══════════ */
@@ -304,14 +299,9 @@
   async function startRegisterExpression() {
     show('register-expression');
     selectedSequence = [];
-    selectedGaze = null;
-    gazeEnabled = false;
-    $('gaze-toggle').checked = false;
-    $('gaze-grid').classList.add('hidden');
 
     // Build expression palette
     buildExpressionPalette();
-    buildGazeGrid();
     updateSequenceBar();
 
     // Bind events only once
@@ -327,12 +317,6 @@
           updateSequenceBar();
           updateExprButtons();
         });
-      });
-
-      $('gaze-toggle').addEventListener('change', e => {
-        gazeEnabled = e.target.checked;
-        $('gaze-grid').classList.toggle('hidden', !gazeEnabled);
-        selectedGaze = null;
       });
 
       $('btn-undo-expr').addEventListener('click', () => {
@@ -360,30 +344,9 @@
           const cls = ExpressionDetector.classifyExpression(result.blendshapes);
           const expr = cls.id ? exprById(cls.id) : null;
 
-          // Gaze detection
-          const gaze = ExpressionDetector.computeGaze(result.landmarks);
-          const gazeDir = gazeById(gaze.id);
-
-          // Update label: expression + gaze
-          const label = $('expr-preview-label');
-          if (gazeEnabled) {
-            const exprName = expr ? expr.name : '--';
-            const gazeName = gazeDir ? gazeDir.name : '---';
-            // Show raw x,y for debug (remove later)
-            label.innerHTML = `<span>${exprName}</span><span class="gaze-live-label">${gazeName}(${gaze.x.toFixed(2)})</span>`;
-          } else {
-            label.textContent = expr ? expr.name : '--';
-          }
-
-          // Highlight detected gaze cell in grid
-          if (gazeEnabled) {
-            document.querySelectorAll('.gaze-cell').forEach(c => c.classList.remove('detected'));
-            const cell = document.querySelector(`.gaze-cell[data-gaze-id="${gaze.id}"]`);
-            if (cell) cell.classList.add('detected');
-          }
+          $('expr-preview-label').textContent = expr ? expr.name : '--';
         } else {
           $('expr-preview-label').textContent = '--';
-          document.querySelectorAll('.gaze-cell').forEach(c => c.classList.remove('detected'));
         }
       });
     } catch (e) {
@@ -411,36 +374,9 @@
 
   function onExpressionSelect(exprId) {
     if (selectedSequence.length >= passwordLength) return;
-
-    const item = { exprId };
-    if (gazeEnabled && selectedGaze) {
-      item.gazeId = selectedGaze;
-    }
-    selectedSequence.push(item);
-    selectedGaze = null;
-
-    // Deselect gaze cells
-    document.querySelectorAll('.gaze-cell').forEach(c => c.classList.remove('selected'));
-
+    selectedSequence.push({ exprId });
     updateSequenceBar();
     updateExprButtons();
-  }
-
-  function buildGazeGrid() {
-    const grid = $('gaze-grid');
-    grid.innerHTML = '';
-    ExpressionDetector.GAZE_DIRS.forEach(dir => {
-      const cell = document.createElement('div');
-      cell.className = 'gaze-cell';
-      cell.dataset.gazeId = dir.id;
-      cell.innerHTML = `<span class="gaze-dot"></span>`;
-      cell.addEventListener('click', () => {
-        document.querySelectorAll('.gaze-cell').forEach(c => c.classList.remove('selected'));
-        cell.classList.add('selected');
-        selectedGaze = dir.id;
-      });
-      grid.appendChild(cell);
-    });
   }
 
   function updateSequenceBar() {
@@ -450,12 +386,10 @@
     } else {
       bar.innerHTML = selectedSequence.map((item, i) => {
         const expr = exprById(item.exprId);
-        const gazeName = item.gazeId ? gazeById(item.gazeId)?.name : '';
         return `<div class="sequence-item">
           <span class="seq-num">${i + 1}</span>
           <img class="seq-icon" src="${expressionSVG(item.exprId)}" alt="${expr.name}"
                onerror="this.outerHTML='<span class=seq-icon style=font-size:24px>${expr.emoji}</span>'">
-          ${gazeName ? `<span class="seq-gaze">${gazeName}</span>` : ''}
         </div>`;
       }).join('');
     }
@@ -514,20 +448,6 @@
     icon.innerHTML = `<img src="${expressionSVG(item.exprId)}" alt="${expr.name}" style="width:36px;height:36px"
       onerror="this.outerHTML='<span style=font-size:28px>${expr.emoji}</span>'">`;
 
-    // Update gaze dot
-    const gazeDot = $('recording-gaze-dot');
-    if (item.gazeId && item.gazeId !== 'mc') {
-      const gaze = gazeById(item.gazeId);
-      gazeDot.classList.remove('hidden');
-      // Position gaze dot on the viewport
-      const col = gaze.col; // 0,1,2
-      const row = gaze.row; // 0,1,2
-      gazeDot.style.left = (15 + col * 35) + '%';
-      gazeDot.style.top = (15 + row * 35) + '%';
-    } else {
-      gazeDot.classList.add('hidden');
-    }
-
     $('recording-instruction').textContent = `${expr.name}の表情をしてください (${recordingStep + 1}/${selectedSequence.length})`;
   }
 
@@ -550,13 +470,6 @@
     // Expression match
     let pct = ExpressionDetector.matchScore(result.blendshapes, item.exprId);
 
-    // Gaze match (blend in if enabled)
-    if (item.gazeId) {
-      const gazePct = ExpressionDetector.gazeMatchScore(result.landmarks, item.gazeId);
-      pct = Math.round(pct * 0.7 + gazePct * 0.3);
-    }
-
-    // Also check if this IS the best-matching expression
     const classified = ExpressionDetector.classifyExpression(result.blendshapes);
     const isTarget = classified.id === item.exprId;
 
@@ -630,7 +543,6 @@
       transitionIntervals: intervals,
       blendshapeProfiles: recordedProfiles,
       passwordLength: passwordLength,
-      gazeEnabled: gazeEnabled,
       createdAt: Date.now(),
     });
 
@@ -745,16 +657,6 @@
     icon.innerHTML = `<img src="${expressionSVG(item.exprId)}" alt="${expr.name}" style="width:36px;height:36px"
       onerror="this.outerHTML='<span style=font-size:28px>${expr.emoji}</span>'">`;
 
-    const gazeDot = $('auth-gaze-dot');
-    if (item.gazeId && item.gazeId !== 'mc') {
-      const gaze = gazeById(item.gazeId);
-      gazeDot.classList.remove('hidden');
-      gazeDot.style.left = (15 + gaze.col * 35) + '%';
-      gazeDot.style.top = (15 + gaze.row * 35) + '%';
-    } else {
-      gazeDot.classList.add('hidden');
-    }
-
     $('auth-expr-instruction').textContent = `${expr.name} (${authStep + 1}/${exprData.sequence.length})`;
   }
 
@@ -828,10 +730,6 @@
 
     // ── Expression matching (category + biometric) ──
     let categoryPct = ExpressionDetector.matchScore(result.blendshapes, item.exprId);
-    if (item.gazeId) {
-      const gazePct = ExpressionDetector.gazeMatchScore(result.landmarks, item.gazeId);
-      categoryPct = Math.round(categoryPct * 0.7 + gazePct * 0.3);
-    }
 
     // Biometric: compare blendshape vector against registered profile
     let bioPct = 100; // default pass if no profile stored
@@ -897,14 +795,12 @@
     const details = $('success-details');
     const seqText = exprData.sequence.map((item, i) => {
       const expr = exprById(item.exprId);
-      const gaze = item.gazeId ? gazeById(item.gazeId)?.name : '';
-      return `${i + 1}. ${expr.name}${gaze ? ' + ' + gaze : ''}`;
+      return `${i + 1}. ${expr.name}`;
     }).join('\n');
 
     const hasBio = exprData.blendshapeProfiles && exprData.blendshapeProfiles.some(p => p);
     details.innerHTML = `
       <div><strong>パスワード長:</strong> ${exprData.sequence.length}ステップ</div>
-      <div><strong>視線方向:</strong> ${exprData.gazeEnabled ? 'ON' : 'OFF'}</div>
       <div><strong>表情バイオメトリクス:</strong> ${hasBio ? 'ON（筋肉パターン照合）' : 'OFF'}</div>
       <div><strong>常時顔照合:</strong> ON</div>
       <div><strong>シーケンス:</strong></div>
