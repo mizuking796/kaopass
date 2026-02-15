@@ -483,6 +483,12 @@ html, body {
   margin-bottom: 4px;
 }
 
+/* Auth countdown */
+.auth-countdown {
+  font-size: 13px; color: var(--text2);
+  font-variant-numeric: tabular-nums;
+}
+
 /* Auth face status */
 .auth-face-status {
   display: flex; align-items: center; justify-content: center;

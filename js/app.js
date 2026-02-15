@@ -39,11 +39,13 @@
   const EXPR_BIOMETRIC_THRESHOLD = 0.5; // min cosine similarity to pass
 
   // Auth state
+  const AUTH_TIMEOUT_MS = 30000; // 30 seconds total for face + expression auth
   let authStartTime = 0;
   let authStep = 0;
   let authHoldStart = 0;
   let authFailCount = 0;
   let parallaxBaseLandmarks = null;
+  let authGlobalTimerId = null;
 
   // ── Continuous face verification during expression auth ──
   const FACE_RECHECK_INTERVAL = 1500; // ms between face re-checks
@@ -557,6 +559,9 @@
     // authFailCount is NOT reset here — persists across retries for cooldown
     parallaxBaseLandmarks = null;
 
+    // Start 30s global timer
+    startAuthGlobalTimer();
+
     $('auth-face-status-text').textContent = '認識中...';
     $('auth-face-spinner').style.display = '';
 
@@ -631,8 +636,6 @@
 
     buildAuthSteps(exprData.sequence.length);
     updateAuthTarget(exprData);
-    startAuthTimer(exprData.sequence.length);
-
     const video = $('auth-expr-video');
     await FaceEngine.startCamera(video);
     FaceEngine.startDetectionLoop(video, result => onAuthExprFrame(result, exprData));
@@ -781,6 +784,7 @@
   }
 
   function onAuthSuccess(exprData) {
+    stopAuthGlobalTimer();
     if (authTimerId) { cancelAnimationFrame(authTimerId); authTimerId = null; }
     FaceEngine.stopDetectionLoop();
     FaceEngine.stopCamera($('auth-expr-video'));
@@ -808,7 +812,48 @@
     `;
   }
 
+  /* ── 30s global auth timer ── */
+  function startAuthGlobalTimer() {
+    stopAuthGlobalTimer();
+    const el = $('auth-global-timer');
+    if (el) el.classList.remove('hidden');
+    const start = performance.now();
+    function tick() {
+      const remaining = Math.max(0, AUTH_TIMEOUT_MS - (performance.now() - start));
+      const secs = Math.ceil(remaining / 1000);
+      // Update both screens' timer display
+      document.querySelectorAll('.auth-countdown').forEach(e => {
+        e.textContent = secs + '秒';
+        if (secs <= 10) e.style.color = 'var(--red)';
+        else if (secs <= 20) e.style.color = 'var(--orange)';
+        else e.style.color = 'var(--text2)';
+      });
+      if (remaining <= 0) {
+        // Time's up — stop everything and fail
+        FaceEngine.stopDetectionLoop();
+        const faceVideo = $('auth-face-video');
+        const exprVideo = $('auth-expr-video');
+        if (faceVideo) FaceEngine.stopCamera(faceVideo);
+        if (exprVideo) FaceEngine.stopCamera(exprVideo);
+        if (authTimerId) { cancelAnimationFrame(authTimerId); authTimerId = null; }
+        authFailCount++;
+        const cooldown = authFailCount >= 5 ? 30 : authFailCount >= 3 ? 10 : 3;
+        showCooldown(cooldown);
+        return;
+      }
+      if (currentScreen === 'auth-face' || currentScreen === 'auth-expression') {
+        authGlobalTimerId = requestAnimationFrame(tick);
+      }
+    }
+    tick();
+  }
+
+  function stopAuthGlobalTimer() {
+    if (authGlobalTimerId) { cancelAnimationFrame(authGlobalTimerId); authGlobalTimerId = null; }
+  }
+
   function onAuthFail() {
+    stopAuthGlobalTimer();
     if (authTimerId) { cancelAnimationFrame(authTimerId); authTimerId = null; }
     FaceEngine.stopDetectionLoop();
     FaceEngine.stopCamera($('auth-expr-video'));
